@@ -1,0 +1,46 @@
+services:
+  docker-socket-setup:
+    image: alpine
+    container_name: docker_socket_permission_jenkins
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        chmod 666 /var/run/docker.sock
+
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins
+    # We start as root, but entrypoint switches to rrkts_jenskin
+    user: rrkts_jenkins #root #rrkts_jenskin
+    ports:
+      - "80:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      #- /home/odl_user_1662718/dbt:/var/jenskin_home/dbt_files
+    environment:
+      - JAVA_OPTS="-Djenkins.install.runSetupWizard=true -Dhudson.security.csrf.DefaultCrumbIssuer.EXCLUDE_SESSION_ID=true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/login | grep -q 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - network_test
+
+networks:
+  network_test:
+    name: network_test
+    external: true
+
+volumes:
+  jenkins_home:
+    driver: local
